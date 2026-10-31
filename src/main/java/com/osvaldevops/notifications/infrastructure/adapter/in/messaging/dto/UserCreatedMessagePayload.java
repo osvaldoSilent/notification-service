@@ -1,0 +1,23 @@
+package com.osvaldevops.notifications.infrastructure.adapter.in.messaging.dto;
+
+import java.time.Instant;
+import java.util.UUID;
+
+/**
+ * Inbound Kafka JSON message payload matching the event published by {@code login-service}
+ * on the {@code user-created-events} topic.
+ *
+ * @param userId    unique identifier (UUID) of the created user
+ * @param email     registered email address of the user
+ * @param userName  display username of the user
+ * @param role      assigned authorization role
+ * @param createdAt timestamp when the user was created
+ */
+public record UserCreatedMessagePayload(
+        UUID userId,
+        String email,
+        String userName,
+        String role,
+        Instant createdAt
+) {}
+
