@@ -1,5 +1,6 @@
 package com.osvaldevops.notifications.infrastructure.adapter.in.web.exception;
 
+import com.osvaldevops.notifications.domain.exception.InvalidPubSubMessageException;
 import com.osvaldevops.notifications.domain.exception.NotificationDeliveryException;
 import com.osvaldevops.notifications.infrastructure.adapter.in.web.dto.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,7 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
 /**
- * Centralized REST exception handler translating domain, validation, and delivery
+ * Centralized REST exception handler translating domain, Pub/Sub push, validation, and delivery
  * exceptions into standardized {@link ApiErrorResponse} payloads.
  */
 @Slf4j
@@ -24,13 +25,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     /**
-     * Handles invalid arguments rejected by domain validation ({@code 400 Bad Request}).
+     * Handles invalid arguments or malformed Pub/Sub push messages ({@code 400 Bad Request}).
      */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<ApiErrorResponse> handleIllegalArgument(
-            IllegalArgumentException ex,
+    @ExceptionHandler({IllegalArgumentException.class, InvalidPubSubMessageException.class})
+    public ResponseEntity<ApiErrorResponse> handleBadRequestExceptions(
+            RuntimeException ex,
             HttpServletRequest request
     ) {
+        log.warn("Invalid request or Pub/Sub message on {}: {}", request.getRequestURI(), ex.getMessage());
         return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), request.getRequestURI(), null);
     }
 
@@ -71,7 +73,8 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * Handles notification delivery failures ({@code 503 Service Unavailable}).
+     * Handles notification delivery failures ({@code 503 Service Unavailable}), allowing
+     * GCP Pub/Sub Push subscriptions to NACK and retry delivery automatically.
      */
     @ExceptionHandler(NotificationDeliveryException.class)
     public ResponseEntity<ApiErrorResponse> handleNotificationDeliveryException(
@@ -124,4 +127,3 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 }
-

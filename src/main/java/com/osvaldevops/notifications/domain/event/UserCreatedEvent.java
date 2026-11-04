@@ -4,7 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Domain event representing a user registration event consumed from Apache Kafka.
+ * Domain event representing a user registration event consumed from Google Cloud Pub/Sub.
  *
  * @param userId    unique identifier (UUID) of the newly created user
  * @param email     registered email address of the user
@@ -19,4 +19,3 @@ public record UserCreatedEvent(
         String role,
         Instant createdAt
 ) {}
-

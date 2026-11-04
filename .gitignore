@@ -37,7 +37,7 @@ jacoco.exec
 **/jacoco.exec
 
 # AI & Agent Configurations
-.antigravity/
+# .antigravity/
 .gemini/
 
 # VS Code
@@ -68,9 +68,8 @@ bin/
 .env
 .env.*
 application-local.yml
-
+# src/main/resources/application-dev.yml
 src/main/resources/application.yml
-/target
 
 # OS Generated
 .DS_Store

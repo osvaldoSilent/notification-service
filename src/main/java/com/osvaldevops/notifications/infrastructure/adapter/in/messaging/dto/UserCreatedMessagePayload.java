@@ -4,8 +4,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Inbound Kafka JSON message payload matching the event published by {@code login-service}
- * on the {@code user-created-events} topic.
+ * Inbound JSON message payload matching the {@code UserCreatedEvent} published by {@code login-service}
+ * to Google Cloud Pub/Sub.
  *
  * @param userId    unique identifier (UUID) of the created user
  * @param email     registered email address of the user
@@ -20,4 +20,3 @@ public record UserCreatedMessagePayload(
         String role,
         Instant createdAt
 ) {}
-

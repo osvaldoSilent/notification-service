@@ -1,4 +1,4 @@
-name: CI - Build & Test
+name: CI/CD Pipeline - Quality Gate & Cloud Run
 
 on:
   push:
@@ -6,74 +6,89 @@ on:
   pull_request:
     branches: [ "main" ]
 
+# Required permissions for Google Cloud Workload Identity Federation (OIDC)
+permissions:
+  id-token: write # Allows GitHub Actions to request an OIDC token from GCP
+  contents: read  # Allows checking out the repository source code
+
 jobs:
-  build-and-verify:
+  verify-and-deploy:
     runs-on: ubuntu-latest
-    
-    # 1. Declarar infraestructura efímera para el Job
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: adminpassword
-          POSTGRES_DB: notification_db
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
-      zookeeper:
-        image: confluentinc/cp-zookeeper:7.4.0
-        ports:
-          - 2181:2181
-        env:
-          ZOOKEEPER_CLIENT_PORT: 2181
-          ZOOKEEPER_TICK_TIME: 2000
-
-      kafka:
-        image: confluentinc/cp-kafka:7.4.0
-        ports:
-          - 9092:9092
-        env:
-          KAFKA_BROKER_ID: 1
-          KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-          KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
-          KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-    
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Setup Java 25
+
+      - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
           java-version: '25'
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Run Unit Tests & Cucumber
-        env:
-          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/notification_db
-          SPRING_DATASOURCE_USERNAME: admin
-          SPRING_DATASOURCE_PASSWORD: adminpassword
-          KAFKA_BOOTSTRAP_SERVERS: localhost:9092
-        run: mvn clean verify
-
-      - name: SonarCloud Quality Gate
+      - name: Run Unit Tests, Coverage & SonarQube Quality Gate
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST: ${{ secrets.SONAR_HOST }}
-          SONAR_ORGANIZATION_KEY: ${{ secrets.SONAR_ORGANIZATION_KEY }}
+          SONAR_HOST_URL: "https://sonarcloud.io"
           SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          SONAR_ORGANIZATION_KEY: ${{ secrets.SONAR_ORGANIZATION_KEY }}
+          SPRING_PROFILES_ACTIVE: dev
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          PUBSUB_SUBSCRIBER_ENABLED: "false"
+          PUBSUB_USER_CREATED_SUBSCRIPTION: ${{ secrets.PUBSUB_USER_CREATED_SUBSCRIPTION }}
+          MAIL_HOST: ${{ secrets.MAIL_HOST }}
+          MAIL_PORT: ${{ secrets.MAIL_PORT }}
+          MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+          MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+          NOTIFICATION_SENDER_EMAIL: ${{ secrets.NOTIFICATION_SENDER_EMAIL }}
+          MAIL_ENABLED: "false"
         run: |
-          mvn sonar:sonar \
-            -Dsonar.host.url=$SONAR_HOST \
+          mvn clean verify sonar:sonar \
+            -Dsonar.host.url=$SONAR_HOST_URL \
             -Dsonar.organization=$SONAR_ORGANIZATION_KEY \
             -Dsonar.projectKey=$SONAR_PROJECT_KEY \
             -Dsonar.token=$SONAR_TOKEN \
             -Dsonar.qualitygate.wait=true
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy]')
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+          token_format: 'access_token'
+
+      - name: Build and Push Container with Jib
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy]')
+        env:
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+        run: |
+          mvn compile com.google.cloud.tools:jib-maven-plugin:3.4.5:build \
+            -Djib.from.image=eclipse-temurin:25-jre-alpine \
+            -Djib.to.image="us-central1-docker.pkg.dev/${GCP_PROJECT_ID}/microservices/notification-service:${GITHUB_SHA}" \
+            -Djib.to.auth.username="oauth2accesstoken" \
+            -Djib.to.auth.password="${{ steps.auth.outputs.access_token }}" \
+            -Djib.container.jvmFlags="-XX:+UseCompactObjectHeaders,-XX:+UseSerialGC,-XX:MaxRAMPercentage=75.0,-XX:TieredStopAtLevel=1,-Djava.security.egd=file:/dev/./urandom"
+
+      - name: Deploy to Cloud Run
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && contains(github.event.head_commit.message, '[deploy]')
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: notification-service
+          region: us-central1
+          image: us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/microservices/notification-service:${{ github.sha }}
+          env_vars: |
+            SPRING_PROFILES_ACTIVE=dev
+            GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
+            PUBSUB_SUBSCRIBER_ENABLED=true
+            PUBSUB_USER_CREATED_SUBSCRIPTION=${{ secrets.PUBSUB_USER_CREATED_SUBSCRIPTION }}
+            MAIL_HOST=${{ secrets.MAIL_HOST }}
+            MAIL_PORT=${{ secrets.MAIL_PORT }}
+            MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}
+            MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
+            NOTIFICATION_SENDER_EMAIL=${{ secrets.NOTIFICATION_SENDER_EMAIL }}
+            MAIL_ENABLED=true
+          flags: '--service-account=cloud-run-sa@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com --allow-unauthenticated --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --cpu-boost'

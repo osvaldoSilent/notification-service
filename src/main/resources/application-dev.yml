@@ -1,28 +1,40 @@
 spring:
   application:
     name: notification-service
+  main:
+    lazy-initialization: true
+    banner-mode: off
+  threads:
+    virtual:
+      enabled: true
 
-  kafka:
-    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
-    consumer:
-      group-id: ${KAFKA_CONSUMER_GROUP_ID:notification-service-group}
-      auto-offset-reset: earliest
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
-      properties:
-        spring.json.trusted.packages: "*"
-        spring.json.value.default.type: com.osvaldevops.notifications.infrastructure.adapter.in.messaging.dto.UserCreatedMessagePayload
-        spring.json.use.type.headers: false
+  cloud:
+    gcp:
+      project-id: ${GCP_PROJECT_ID}
+
+  mail:
+    host: ${MAIL_HOST}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME}
+    password: ${MAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 app:
-  kafka:
-    topics:
-      user-created: ${KAFKA_USER_CREATED_TOPIC:user-created-events}
+  pubsub:
+    subscriber-enabled: ${PUBSUB_SUBSCRIBER_ENABLED:true}
+    subscriptions:
+      user-created: ${PUBSUB_USER_CREATED_SUBSCRIPTION}
   notifications:
-    sender-address: ${NOTIFICATION_SENDER_EMAIL:no-reply@osvaldevops.com}
+    sender-address: ${NOTIFICATION_SENDER_EMAIL}
+    mail-enabled: ${MAIL_ENABLED:true}
 
 server:
-  port: 8082
+  port: ${PORT:8082}
 
 springdoc:
   api-docs:
@@ -36,8 +48,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health
   endpoint:
     health:
-      show-details: always
+      show-details: when_authorized
 
+logging:
+  level:
+    com.osvaldevops.notifications: INFO

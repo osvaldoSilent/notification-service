@@ -7,7 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * OpenAPI 3 / Swagger UI configuration defining API metadata for the Notifications Service.
+ * OpenAPI 3 / Swagger UI configuration defining API metadata for the Notification Service.
  */
 @Configuration
 public class OpenApiConfig {
@@ -21,10 +21,9 @@ public class OpenApiConfig {
                 .info(new Info()
                         .title("Notification Service API")
                         .version("1.0.0")
-                        .description("Hexagonal Architecture Notification Service consuming UserCreatedEvent from Apache Kafka and dispatching welcome notifications.")
+                        .description("Hexagonal Architecture Notification Service on Google Cloud Run consuming GCP Pub/Sub Push events and dispatching SMTP email notifications.")
                         .contact(new Contact()
                                 .name("OsvalDevOps")
                                 .email("contact@osvaldevops.com")));
     }
 }
-

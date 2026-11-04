@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.osvaldevops.notifications.domain.exception.InvalidPubSubMessageException;
 import com.osvaldevops.notifications.domain.exception.NotificationDeliveryException;
 import com.osvaldevops.notifications.infrastructure.adapter.in.web.dto.ApiErrorResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,7 +31,7 @@ class GlobalExceptionHandlerTest {
     void setUp() {
         exceptionHandler = new GlobalExceptionHandler();
         request = mock(HttpServletRequest.class);
-        when(request.getRequestURI()).thenReturn("/api/v1/notifications/welcome");
+        when(request.getRequestURI()).thenReturn("/api/v1/pubsub/events");
     }
 
     @Test
@@ -40,14 +41,32 @@ class GlobalExceptionHandlerTest {
         IllegalArgumentException ex = new IllegalArgumentException("Recipient email must not be null or blank");
 
         // When
-        ResponseEntity<ApiErrorResponse> response = exceptionHandler.handleIllegalArgument(ex, request);
+        ResponseEntity<ApiErrorResponse> response = exceptionHandler.handleBadRequestExceptions(ex, request);
 
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(java.util.Objects.requireNonNull(response.getBody()).status()).isEqualTo(400);
-        assertThat(java.util.Objects.requireNonNull(response.getBody()).message())
-            .isEqualTo("Recipient email must not be null or blank");
+        assertThat(response.getBody().status()).isEqualTo(400);
+        assertThat(response.getBody().message()).isEqualTo("Recipient email must not be null or blank");
+    }
+
+    @Test
+    @DisplayName("Should return 400 BAD_REQUEST for InvalidPubSubMessageException")
+    void should_ReturnBadRequest_When_InvalidPubSubMessageExceptionThrown() {
+        // Given
+        InvalidPubSubMessageException ex = new InvalidPubSubMessageException(
+                "Failed to decode Base64 Pub/Sub message data",
+                new IllegalArgumentException("Bad Base64")
+        );
+
+        // When
+        ResponseEntity<ApiErrorResponse> response = exceptionHandler.handleBadRequestExceptions(ex, request);
+
+        // Then
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).isNotNull();
+        assertThat(response.getBody().status()).isEqualTo(400);
+        assertThat(response.getBody().message()).isEqualTo("Failed to decode Base64 Pub/Sub message data");
     }
 
     @Test
@@ -67,8 +86,7 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(java.util.Objects.requireNonNull(response.getBody()).validationErrors())
-            .containsEntry("email", "Email must be valid");
+        assertThat(response.getBody().validationErrors()).containsEntry("email", "Email must be valid");
     }
 
     @Test
@@ -83,8 +101,7 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(java.util.Objects.requireNonNull(response.getBody()).message())
-            .isEqualTo("Malformed JSON request body");
+        assertThat(response.getBody().message()).isEqualTo("Malformed JSON request body");
     }
 
     @Test
@@ -99,7 +116,7 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody()).isNotNull();
-        assertThat(java.util.Objects.requireNonNull(response.getBody()).status()).isEqualTo(503);
+        assertThat(response.getBody().status()).isEqualTo(503);
     }
 
     @Test
@@ -114,7 +131,6 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
-        assertThat(java.util.Objects.requireNonNull(response.getBody()).status()).isEqualTo(500);
+        assertThat(response.getBody().status()).isEqualTo(500);
     }
 }
-
