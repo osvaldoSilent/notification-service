@@ -45,8 +45,9 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().status()).isEqualTo(400);
-        assertThat(response.getBody().message()).isEqualTo("Recipient email must not be null or blank");
+        assertThat(java.util.Objects.requireNonNull(response.getBody()).status()).isEqualTo(400);
+        assertThat(java.util.Objects.requireNonNull(response.getBody()).message())
+            .isEqualTo("Recipient email must not be null or blank");
     }
 
     @Test
@@ -66,7 +67,8 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().validationErrors()).containsEntry("email", "Email must be valid");
+        assertThat(java.util.Objects.requireNonNull(response.getBody()).validationErrors())
+            .containsEntry("email", "Email must be valid");
     }
 
     @Test
@@ -81,7 +83,8 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().message()).isEqualTo("Malformed JSON request body");
+        assertThat(java.util.Objects.requireNonNull(response.getBody()).message())
+            .isEqualTo("Malformed JSON request body");
     }
 
     @Test
@@ -96,7 +99,7 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().status()).isEqualTo(503);
+        assertThat(java.util.Objects.requireNonNull(response.getBody()).status()).isEqualTo(503);
     }
 
     @Test
@@ -111,7 +114,7 @@ class GlobalExceptionHandlerTest {
         // Then
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.INTERNAL_SERVER_ERROR);
         assertThat(response.getBody()).isNotNull();
-        assertThat(response.getBody().status()).isEqualTo(500);
+        assertThat(java.util.Objects.requireNonNull(response.getBody()).status()).isEqualTo(500);
     }
 }
 
