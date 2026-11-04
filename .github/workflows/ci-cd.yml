@@ -69,7 +69,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           mvn sonar:sonar \
-            -Dsonar.host.url=https://sonarcloud.io \
-            -Dsonar.organization=REEMPLAZAR_POR_TU_ORG \
-            -Dsonar.projectKey=REEMPLAZAR_POR_TU_PROJECT_KEY \
+            -Dsonar.host.url= ${{ secrets.SONAR_HOST }} \
+            -Dsonar.organization= ${{ secrets.SONAR_ORGANIZATION_KEY }} \
+            -Dsonar.projectKey= ${{ secrets.SONAR_PROJECT_KEY }} \
             -Dsonar.qualitygate.wait=true
