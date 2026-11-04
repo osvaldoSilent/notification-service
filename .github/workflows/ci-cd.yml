@@ -67,9 +67,13 @@ jobs:
       - name: SonarCloud Quality Gate
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST: ${{ secrets.SONAR_HOST }}
+          SONAR_ORGANIZATION_KEY: ${{ secrets.SONAR_ORGANIZATION_KEY }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
         run: |
           mvn sonar:sonar \
-            -Dsonar.host.url= ${{ secrets.SONAR_HOST }} \
-            -Dsonar.organization= ${{ secrets.SONAR_ORGANIZATION_KEY }} \
-            -Dsonar.projectKey= ${{ secrets.SONAR_PROJECT_KEY }} \
+            -Dsonar.host.url= $SONAR_HOST \
+            -Dsonar.organization= $SONAR_ORGANIZATION_KEY \
+            -Dsonar.projectKey= $SONAR_PROJECT_KEY \
+            -Dsonar.token= $SONAR_TOKEN \
             -Dsonar.qualitygate.wait=true
