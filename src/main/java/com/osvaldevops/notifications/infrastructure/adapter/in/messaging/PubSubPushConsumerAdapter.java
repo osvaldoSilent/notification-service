@@ -21,6 +21,7 @@ import java.util.Base64;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -63,15 +64,20 @@ public class PubSubPushConsumerAdapter {
             @ApiResponse(
                     responseCode = "400",
                     description = "Invalid Pub/Sub envelope, Base64 data, JSON payload, or unsupported eventType",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class))
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ApiErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Unexpected internal server error",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ApiErrorResponse.class))
             ),
             @ApiResponse(
                     responseCode = "503",
                     description = "Notification delivery failed (triggers Pub/Sub NACK and retry)",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class))
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ApiErrorResponse.class))
             )
     })
-    @PostMapping("/events")
+    @PostMapping(value = "/events", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Void> onPubSubPushMessage(@RequestBody PubSubPushRequest pushRequest) {
         if (pushRequest == null || pushRequest.message() == null) {
             throw new InvalidPubSubMessageException("Pub/Sub push request and message envelope must not be null");

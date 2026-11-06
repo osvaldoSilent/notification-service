@@ -15,6 +15,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -27,7 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
-@Tag(name = "Notifications", description = "Endpoints for triggering and testing user notifications")
+@Tag(name = "Notifications", description = "Endpoints for triggering and testing user welcome notifications")
 public class NotificationController {
 
     private final SendWelcomeNotificationUseCase sendWelcomeNotificationUseCase;
@@ -41,26 +42,31 @@ public class NotificationController {
      */
     @Operation(
             summary = "Send a welcome notification",
-            description = "Composes and dispatches a welcome notification to the specified user email."
+            description = "Composes and dispatches a welcome notification to the specified user email via SMTP (or simulation mode)."
     )
     @ApiResponses({
             @ApiResponse(
                     responseCode = "201",
                     description = "Welcome notification successfully sent",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = NotificationResponse.class))
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = NotificationResponse.class))
             ),
             @ApiResponse(
                     responseCode = "400",
-                    description = "Validation error or malformed JSON",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class))
+                    description = "Validation error or malformed JSON request body",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ApiErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Unexpected internal server error",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ApiErrorResponse.class))
             ),
             @ApiResponse(
                     responseCode = "503",
-                    description = "Notification delivery service unavailable",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiErrorResponse.class))
+                    description = "Notification delivery service is temporarily unavailable",
+                    content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE, schema = @Schema(implementation = ApiErrorResponse.class))
             )
     })
-    @PostMapping("/welcome")
+    @PostMapping(value = "/welcome", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<NotificationResponse> sendWelcome(@Valid @RequestBody SendNotificationRequest request) {
         WelcomeNotification notification = sendWelcomeNotificationUseCase.sendWelcomeNotification(
                 notificationWebMapper.toEvent(request)
