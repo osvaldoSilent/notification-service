@@ -77,4 +77,11 @@ Whenever a major iteration is completed in `notifications-service`:
 - **Iteration 1 (Unit Testing & Java 25 Compatibility):** Configured `maven-surefire-plugin` with ByteBuddy experimental flag for Java 25 and JaCoCo `prepare-agent`, reaching 100% unit test coverage.
 - **Iteration 2 (Kafka to GCP Pub/Sub Push & Pull + SMTP Mail):** Replaced Kafka consumer with `PubSubPushConsumerAdapter` and `PubSubUserCreatedSubscriberAdapter`, added `EmailNotificationSenderAdapter` with `JavaMailSender`, and removed hardcoded `@Value` fallbacks.
 - **Iteration 3 (DevSecOps Secrets Masking, Cloud Run Memory Tuning & OpenAPI 3 Optimization):** Un-ignored `application-dev.yml` and `.antigravity/` in `.gitignore`, masked all GCP and SMTP credentials with `${ENV_VAR}` placeholders, enabled Java 25 Virtual Threads & `lazy-initialization: true`, configured Jib (`eclipse-temurin:25-jre-alpine` + `-XX:+UseCompactObjectHeaders`) with `[deploy]` commit gate in `ci-cd.yml`, and enriched OpenAPI 3 schemas.
+- **Iteration 4 (OIDC Cloud Run Hardening & Pub/Sub Backoff/DLQ Resilience — `2026-11-06`):** Updated `.github/workflows/ci-cd.yml` to deploy with `--no-allow-unauthenticated` and `PUBSUB_SUBSCRIBER_ENABLED=false` for private Push HTTP webhook execution authenticated via GCP OIDC (`roles/run.invoker`), and documented Pub/Sub Exponential Backoff (`10s`–`600s`) + Dead Letter Topic (`user-created-dlq-topic`, `max-delivery-attempts=5`) in `README.md`.
+
+---
+
+# 6. Session Closure
+- **Session Status:** `CLOSED` — Ready for production deployment on Google Cloud Run (`2026-11-06`).
+- **Verification Summary:** 28/28 unit tests passing (`mvn verify` 100% JaCoCo coverage across 10 analyzed classes), zero framework imports in `domain/`, zero exposed secrets in tracked files.
 

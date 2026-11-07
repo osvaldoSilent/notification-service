@@ -92,13 +92,58 @@ Con el servicio en ejecución, la documentación interactiva está disponible en
 
 ---
 
-## 4. Integración con Google Cloud Pub/Sub (Push & Pull) y SMTP
+## 4. Integración con Google Cloud Pub/Sub (Push & Pull), Resiliencia (Backoff + DLQ) y SMTP
 
 1. [`login-service`](../login-service) publica el evento `UserCreatedEvent` en el topic de GCP Pub/Sub con atributo `eventType=USER_CREATED`.
 2. `notifications-service` soporta ambos modos de consumo:
-   - **Push HTTP (`POST /api/v1/pubsub/events`)**: [`PubSubPushConsumerAdapter`](src/main/java/com/osvaldevops/notifications/infrastructure/adapter/in/messaging/PubSubPushConsumerAdapter.java) decodifica `message.data` desde Base64, valida el evento y devuelve `204 No Content` (**ACK**).
+   - **Push HTTP (`POST /api/v1/pubsub/events`)**: [`PubSubPushConsumerAdapter`](src/main/java/com/osvaldevops/notifications/infrastructure/adapter/in/messaging/PubSubPushConsumerAdapter.java) decodifica `message.data` desde Base64, valida el evento y devuelve `204 No Content` (**ACK**). Si el servidor SMTP/Resend falla temporalmente o alcanza su límite diario, [`GlobalExceptionHandler`](src/main/java/com/osvaldevops/notifications/infrastructure/adapter/in/web/exception/GlobalExceptionHandler.java) devuelve `503 Service Unavailable` (**NACK**) para que Pub/Sub reintente el envío.
    - **Pull (`PubSubTemplate`)**: [`PubSubUserCreatedSubscriberAdapter`](src/main/java/com/osvaldevops/notifications/infrastructure/adapter/in/messaging/PubSubUserCreatedSubscriberAdapter.java) escucha activamente la suscripción `${PUBSUB_USER_CREATED_SUBSCRIPTION}` cuando `PUBSUB_SUBSCRIBER_ENABLED=true`.
 3. [`EmailNotificationSenderAdapter`](src/main/java/com/osvaldevops/notifications/infrastructure/adapter/out/notification/EmailNotificationSenderAdapter.java) envía el correo de bienvenida mediante SMTP (`JavaMailSender`) o registra el envío en modo simulación si `MAIL_ENABLED=false`.
+4. **Protección de Cuota en Cloud Run (Exponential Backoff + Dead Letter Topic)**:
+   Para evitar que un fallo en el proveedor de correo o un mensaje corrupto (*poison pill*) provoque reintentos inmediatos infinitos que consuman el Free Tier de Cloud Run, configura la suscripción Push en GCP con **Exponential Backoff (`10s` a `600s`)** y un **Dead Letter Topic (`max-delivery-attempts=5`)**:
+   ```bash
+   # 1. Crear el Dead Letter Topic (DLQ) para mensajes que fallen tras 5 intentos
+   gcloud pubsub topics create user-created-dlq-topic
+
+   # 2. Actualizar la suscripción Push con Exponential Backoff y límite de 5 intentos
+   gcloud pubsub subscriptions update user-created-sub \
+     --min-retry-delay=10s \
+     --max-retry-delay=600s \
+     --dead-letter-topic=user-created-dlq-topic \
+     --max-delivery-attempts=5
+
+   # 3. Otorgar permisos al Service Agent de Pub/Sub para mover mensajes fallidos al DLQ
+   export PROJECT_NUMBER=$(gcloud projects describe $(gcloud config get-value project) --format="value(projectNumber)")
+   gcloud pubsub topics add-iam-policy-binding user-created-dlq-topic \
+     --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com" \
+     --role="roles/pubsub.publisher"
+   gcloud pubsub subscriptions add-iam-policy-binding user-created-sub \
+     --member="serviceAccount:service-${PROJECT_NUMBER}@gcp-sa-pubsub.iam.gserviceaccount.com" \
+     --role="roles/pubsub.subscriber"
+   ```
+5. **Autenticación OIDC en Cloud Run (`--no-allow-unauthenticated`)**:
+   En Cloud Run, `notification-service` se despliega como servicio privado (`--no-allow-unauthenticated` en [`.github/workflows/ci-cd.yml`](.github/workflows/ci-cd.yml#L94) y `PUBSUB_SUBSCRIBER_ENABLED=false` para operar exclusivamente por Push HTTP). Solo la suscripción Push de GCP Pub/Sub puede invocarlo presentando un token OIDC firmado por `cloud-run-sa`:
+   ```powershell
+   $PROJECT_ID = (gcloud config get-value project)
+   $PROJECT_NUMBER = (gcloud projects describe $PROJECT_ID --format="value(projectNumber)")
+   $PUSH_URL = (gcloud run services describe notification-service --region=us-central1 --format="value(status.url)") + "/api/v1/pubsub/events"
+
+   # 1. Permitir al Service Agent de Pub/Sub generar tokens OIDC en nombre de cloud-run-sa
+   gcloud projects add-iam-policy-binding $PROJECT_ID `
+     --member="serviceAccount:service-$PROJECT_NUMBER@gcp-sa-pubsub.iam.gserviceaccount.com" `
+     --role="roles/iam.serviceAccountTokenCreator"
+
+   # 2. Otorgar a cloud-run-sa el rol Cloud Run Invoker sobre notification-service
+   gcloud run services add-iam-policy-binding notification-service `
+     --region=us-central1 `
+     --member="serviceAccount:cloud-run-sa@$PROJECT_ID.iam.gserviceaccount.com" `
+     --role="roles/run.invoker"
+
+   # 3. Configurar la suscripción Push para autenticar cada petición con OIDC
+   gcloud pubsub subscriptions update user-created-sub `
+     --push-endpoint=$PUSH_URL `
+     --push-auth-service-account="cloud-run-sa@$PROJECT_ID.iam.gserviceaccount.com"
+   ```
 
 ---
 

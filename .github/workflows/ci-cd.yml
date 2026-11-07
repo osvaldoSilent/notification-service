@@ -83,7 +83,7 @@ jobs:
           env_vars: |
             SPRING_PROFILES_ACTIVE=dev
             GCP_PROJECT_ID=${{ secrets.GCP_PROJECT_ID }}
-            PUBSUB_SUBSCRIBER_ENABLED=true
+            PUBSUB_SUBSCRIBER_ENABLED=false
             PUBSUB_USER_CREATED_SUBSCRIPTION=${{ secrets.PUBSUB_USER_CREATED_SUBSCRIPTION }}
             MAIL_HOST=${{ secrets.MAIL_HOST }}
             MAIL_PORT=${{ secrets.MAIL_PORT }}
@@ -91,4 +91,4 @@ jobs:
             MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}
             NOTIFICATION_SENDER_EMAIL=${{ secrets.NOTIFICATION_SENDER_EMAIL }}
             MAIL_ENABLED=true
-          flags: '--service-account=cloud-run-sa@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com --allow-unauthenticated --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --cpu-boost'
+          flags: '--service-account=cloud-run-sa@${{ secrets.GCP_PROJECT_ID }}.iam.gserviceaccount.com --no-allow-unauthenticated --min-instances=0 --max-instances=2 --memory=512Mi --cpu=1 --cpu-boost'
